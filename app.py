@@ -13,8 +13,16 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
-# Enable CORS
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "https://localhost:3000", "https://192.168.1.6:3000"])
+# Enable CORS - Allow Vercel and localhost
+CORS(app, 
+     supports_credentials=True, 
+     origins=[
+         "http://localhost:3000", 
+         "https://localhost:3000", 
+         "https://192.168.1.6:3000",
+         "https://discord-clone-frontend-pi.vercel.app",
+         "https://*.vercel.app"  # Allow all Vercel preview deployments
+     ])
 
 # Đăng ký các Blueprint với prefix /api
 app.register_blueprint(users_bp, url_prefix="/api")
