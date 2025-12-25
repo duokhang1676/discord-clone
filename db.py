@@ -23,11 +23,8 @@ def get_db():
     except Exception as e:
         print(e)
 
-    db = client["Smart_Parking"]
+    db = client["discord_clone"]
     return db
 
 
 db = get_db()
-customers_collection = db["customers"]  # Collection MongoDB
-customers = list(customers_collection.find({}, {"_id": 0}))
-print(customers)

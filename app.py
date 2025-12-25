@@ -1,6 +1,8 @@
 from flask import Flask
 from flask_cors import CORS
 from routes.users import users_bp
+from routes.messages import messages_bp, init_messages_routes
+from db import get_db
 from datetime import timedelta
 import secrets
 
@@ -23,10 +25,27 @@ CORS(app,
          "https://discord-clone-frontend-pi.vercel.app",
          "https://*.vercel.app"  # Allow all Vercel preview deployments
      ],
-     allow_headers=['Content-Type', 'Authorization'])  # Allow Authorization header for Safari iOS
+     allow_headers=['Content-Type', 'Authorization'],  # Allow Authorization header for Safari iOS
+     methods=['GET', 'POST', 'DELETE', 'OPTIONS'])  # Allow DELETE for clearing messages
+
+# Get database connection
+db = get_db()
 
 # Đăng ký các Blueprint với prefix /api
 app.register_blueprint(users_bp, url_prefix="/api")
+
+# Initialize messages routes with database
+init_messages_routes(db)
+app.register_blueprint(messages_bp, url_prefix="/api")
+
+# Create indexes for better performance
+try:
+    db.messages.create_index([('timestamp', -1)])
+    db.messages.create_index([('created_at', -1)])
+    db.messages.create_index([('username', 1)])
+    print("✅ Database indexes created")
+except Exception as e:
+    print(f"⚠️ Index creation warning: {str(e)}")
 
 @app.route("/")
 def index():
