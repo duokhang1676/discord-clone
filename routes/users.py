@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db
 from datetime import timedelta
+import secrets
 
 # Khởi tạo Blueprint cho authentication
 users_bp = Blueprint("users", __name__)
@@ -84,10 +85,15 @@ def login():
         session['user_id'] = str(user['_id'])
         session['username'] = user['username']
         
+        # Generate session token for Safari iOS compatibility
+        session_token = secrets.token_urlsafe(32)
+        session['token'] = session_token
+        
         return jsonify({
             'success': True,
             'message': 'Đăng nhập thành công!',
-            'username': user['username']
+            'username': user['username'],
+            'session_token': session_token
         }), 200
         
     except Exception as e:
@@ -101,6 +107,20 @@ def logout():
 
 @users_bp.route('/check-auth', methods=['GET'])
 def check_auth():
+    # Check Authorization header first (for Safari iOS)
+    auth_header = request.headers.get('Authorization')
+    
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.replace('Bearer ', '')
+        
+        # Verify token matches session
+        if session.get('token') == token and session.get('user_id'):
+            return jsonify({
+                'authenticated': True,
+                'username': session.get('username')
+            }), 200
+    
+    # Fallback to session-only check (for desktop browsers)
     if 'user_id' in session:
         return jsonify({
             'authenticated': True,

@@ -22,7 +22,8 @@ CORS(app,
          "https://192.168.1.6:3000",
          "https://discord-clone-frontend-pi.vercel.app",
          "https://*.vercel.app"  # Allow all Vercel preview deployments
-     ])
+     ],
+     allow_headers=['Content-Type', 'Authorization'])  # Allow Authorization header for Safari iOS
 
 # Đăng ký các Blueprint với prefix /api
 app.register_blueprint(users_bp, url_prefix="/api")
