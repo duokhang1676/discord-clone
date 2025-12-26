@@ -28,3 +28,12 @@ def get_db():
 
 
 db = get_db()
+
+# Create sessions collection with TTL index for automatic expiration
+sessions_collection = db['sessions']
+try:
+    # TTL index: auto-delete sessions after 24 hours (86400 seconds)
+    sessions_collection.create_index('created_at', expireAfterSeconds=86400)
+    print("✅ Sessions collection with TTL index created")
+except Exception as e:
+    print(f"⚠️ Sessions index warning: {str(e)}")

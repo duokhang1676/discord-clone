@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db
-from datetime import timedelta
+from datetime import datetime, timedelta
 import secrets
 
 # Khởi tạo Blueprint cho authentication
@@ -10,6 +10,7 @@ users_bp = Blueprint("users", __name__)
 # MongoDB connection
 db = get_db()
 users_collection = db['users']
+sessions_collection = db['sessions']
 
 # Create index for username (unique)
 try:
@@ -80,13 +81,21 @@ def login():
         if not check_password_hash(user['password'], password):
             return jsonify({'success': False, 'message': 'Username hoặc password không đúng'}), 401
         
-        # Create session
+        # Generate secure session token
+        session_token = secrets.token_urlsafe(32)
+        
+        # Store session in MongoDB (for Safari iOS compatibility)
+        sessions_collection.insert_one({
+            'token': session_token,
+            'user_id': str(user['_id']),
+            'username': username,
+            'created_at': datetime.utcnow()
+        })
+        
+        # Also set Flask session (for backward compatibility with desktop browsers)
         session.permanent = True
         session['user_id'] = str(user['_id'])
         session['username'] = user['username']
-        
-        # Generate session token for Safari iOS compatibility
-        session_token = secrets.token_urlsafe(32)
         session['token'] = session_token
         
         return jsonify({
@@ -102,32 +111,41 @@ def login():
 
 @users_bp.route('/logout', methods=['POST'])
 def logout():
+    # Remove token from MongoDB if present
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.replace('Bearer ', '')
+        sessions_collection.delete_one({'token': token})
+    
+    # Clear Flask session
     session.clear()
     return jsonify({'success': True, 'message': 'Đăng xuất thành công'}), 200
 
 @users_bp.route('/check-auth', methods=['GET'])
 def check_auth():
-    # Check Authorization header first (for Safari iOS)
+    # Priority 1: Check Authorization header (for Safari iOS)
     auth_header = request.headers.get('Authorization')
     
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.replace('Bearer ', '')
         
-        # Verify token matches session
-        if session.get('token') == token and session.get('user_id'):
+        # Look up token in MongoDB
+        session_data = sessions_collection.find_one({'token': token})
+        
+        if session_data:
             return jsonify({
                 'authenticated': True,
-                'username': session.get('username')
+                'username': session_data['username']
             }), 200
     
-    # Fallback to session-only check (for desktop browsers)
+    # Priority 2: Fallback to Flask session (for desktop browsers)
     if 'user_id' in session:
         return jsonify({
             'authenticated': True,
             'username': session.get('username')
         }), 200
-    else:
-        return jsonify({'authenticated': False}), 200
+    
+    return jsonify({'authenticated': False}), 200
 
 @users_bp.route('/health', methods=['GET'])
 def health():
